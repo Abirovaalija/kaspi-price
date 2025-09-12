@@ -23,42 +23,45 @@ def price_xml():
     # Читаем CSV построчно
     reader = csv.DictReader(io.StringIO(csv_data))
 
-    # Формируем XML
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml += '<kaspi_catalog date="2025-09-12">\n'
-    xml += '  <company>Мой магазин</company>\n'
-    xml += '  <merchantid>12345</merchantid>\n'
+    # Формируем XML по формату Каспи
+    xml = '<?xml version="1.0" encoding="utf-8"?>\n'
+    xml += '<kaspi_catalog date="2025-09-12" xmlns="kaspiShopping" '
+    xml += 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+    xml += 'xsi:schemaLocation="kaspiShopping http://kaspi.kz/kaspishopping.xsd">\n'
+    xml += f'  <company>Феникс</company>\n'
+    xml += f'  <merchantid>16157146</merchantid>\n'
     xml += '  <offers>\n'
 
     for row in reader:
-        sku = html.escape(row["SKU"])
-        model = html.escape(row["model"])
-        brand = html.escape(row["brand"])
-        price = html.escape(row["price"])
+        sku = html.escape(row.get("SKU", "").strip())
+        model = html.escape(row.get("model", "").strip())
+        brand = html.escape(row.get("brand", "").strip())
+        price = html.escape(row.get("price", "").strip())
 
-        # склады
-        stores = []
+        # Составляем availabilities
+        availabilities = []
         for i in range(1, 6):  # PP1 … PP5
-            if row.get(f"PP{i}", "").strip() and row[f"PP{i}"] != "0":
-                stores.append(f"<storeId>PP{i}</storeId>")
+            store_id = row.get(f"PP{i}", "").strip()
+            if store_id and store_id != "0":
+                pre_order = row.get("preorder", "0").strip()  # если есть предзаказ
+                stock_count = row.get(f"stockCount{i}", "0").strip()  # если есть количество
+                availabilities.append(f'<availability available="yes" storeId="{store_id}" preOrder="{pre_order}" stockCount="{stock_count}"/>')
 
-        stores_xml = "\n".join(stores)
-
-        # предзаказ
-        preorder_val = row.get("preorder", "").strip()
-        preorder_xml = f"<preorder>{html.escape(preorder_val)}</preorder>" if preorder_val else ""
+        availabilities_xml = "\n      ".join(availabilities)
 
         xml += f'''    <offer sku="{sku}">
       <model>{model}</model>
       <brand>{brand}</brand>
+      <availabilities>
+      {availabilities_xml}
+      </availabilities>
       <price>{price}</price>
-      {stores_xml}
-      {preorder_xml}
     </offer>\n'''
 
     xml += "  </offers>\n</kaspi_catalog>"
 
     return Response(xml, mimetype='application/xml')
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
