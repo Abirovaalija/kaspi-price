@@ -24,13 +24,12 @@ def price_xml():
     reader = csv.DictReader(io.StringIO(csv_data))
 
     # Формируем XML по формату Каспи
-    xml = '<?xml version="1.0" encoding="utf-8"?>\n'
-    xml += '<kaspi_catalog date="2025-09-12" xmlns="kaspiShopping" '
-    xml += 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
-    xml += 'xsi:schemaLocation="kaspiShopping http://kaspi.kz/kaspishopping.xsd">\n'
-    xml += f'  <company>Феникс</company>\n'
-    xml += f'  <merchantid>16157146</merchantid>\n'
-    xml += '  <offers>\n'
+xml = '<?xml version="1.0" encoding="utf-8"?>\n'
+xml += '<kaspi_catalog date="2025-09-12" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+xml += 'xsi:schemaLocation="http://kaspi.kz/kaspishopping.xsd">\n'
+xml += f'  <company>Феникс</company>\n'
+xml += f'  <merchantid>16157146</merchantid>\n'
+xml += '  <offers>\n'
 
     for row in reader:
         sku = html.escape(row.get("SKU", "").strip())
