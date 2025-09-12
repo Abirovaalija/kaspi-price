@@ -23,17 +23,34 @@ def price_xml():
     reader = csv.DictReader(io.StringIO(csv_data))
 
     # формируем XML
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<kaspi_catalog date="2025-09-12">\n  <company>Мой магазин</company>\n  <merchantid>12345</merchantid>\n  <offers>\n'
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<kaspi_catalog date="2025-09-12">\n'
+    xml += '  <company>Мой магазин</company>\n'
+    xml += '  <merchantid>12345</merchantid>\n'
+    xml += '  <offers>\n'
 
     for row in reader:
-        xml += f'''    <offer sku="{row["sku"]}">
-      <model>{row["name"]}</model>
-      <brand>{row["brand"]}</brand>
-      <price>{row["price"]}</price>
-      <storeId>{row["storeId"]}</storeId>
-    </offer>\n'''
+        xml += f'    <offer sku="{row["SKU"]}">\n'
+        xml += f'      <model>{row["model"]}</model>\n'
+        xml += f'      <brand>{row["brand"]}</brand>\n'
+        xml += f'      <price>{row["price"]}</price>\n'
 
-    xml += "  </offers>\n</kaspi_catalog>"
+        # склады
+        xml += '      <availabilities>\n'
+        for store in ["PP1", "PP2", "PP3", "PP4", "PP5"]:
+            if row.get(store, "").strip().lower() in ["yes", "да", "true", "1"]:
+                xml += f'        <availability available="yes" storeId="{store}"/>\n'
+            else:
+                xml += f'        <availability available="no" storeId="{store}"/>\n'
+        xml += '      </availabilities>\n'
+
+        # предзаказ (если есть число)
+        if row.get("preorder", "").strip():
+            xml += f'      <preOrder>{row["preorder"]}</preOrder>\n'
+
+        xml += '    </offer>\n'
+
+    xml += '  </offers>\n</kaspi_catalog>'
 
     return Response(xml, mimetype='application/xml')
 
