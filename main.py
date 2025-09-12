@@ -2,6 +2,7 @@ from flask import Flask, Response
 import requests
 import csv
 import io
+import html
 
 app = Flask(__name__)
 
@@ -30,10 +31,16 @@ def price_xml():
     xml += '  <offers>\n'
 
     for row in reader:
-        xml += f'    <offer sku="{row["SKU"]}">\n'
-        xml += f'      <model>{row["model"]}</model>\n'
-        xml += f'      <brand>{row["brand"]}</brand>\n'
-        xml += f'      <price>{row["price"]}</price>\n'
+        sku = html.escape(row["SKU"])
+        model = html.escape(row["model"])
+        brand = html.escape(row["brand"])
+        price = html.escape(row["price"])
+        preorder = row.get("preorder", "").strip()
+
+        xml += f'    <offer sku="{sku}">\n'
+        xml += f'      <model>{model}</model>\n'
+        xml += f'      <brand>{brand}</brand>\n'
+        xml += f'      <price>{price}</price>\n'
 
         # склады
         xml += '      <availabilities>\n'
@@ -45,8 +52,8 @@ def price_xml():
         xml += '      </availabilities>\n'
 
         # предзаказ (если есть число)
-        if row.get("preorder", "").strip():
-            xml += f'      <preOrder>{row["preorder"]}</preOrder>\n'
+        if preorder:
+            xml += f'      <preOrder>{html.escape(preorder)}</preOrder>\n'
 
         xml += '    </offer>\n'
 
