@@ -3,11 +3,15 @@ import requests
 import csv
 import io
 import html
+from datetime import datetime
 
 app = Flask(__name__)
 
 # Ссылка на Google Sheets в формате CSV
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgg_vbcJzq_IOqPNPbuTyuLfb1xvapOCP3nTQlfzNmcRj7wh9kyT1oyZJx2W5MSFmPBZeP5T133pj_/pub?gid=1749981972&single=true&output=csv"
+
+# ID магазина Феникс
+MERCHANT_ID = "16157146"
 
 @app.route('/')
 def home():
@@ -23,28 +27,44 @@ def price_xml():
     # Читаем CSV построчно
     reader = csv.DictReader(io.StringIO(csv_data))
 
+    # Текущее время для атрибута date
+    date_now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
     # Формируем XML по формату Каспи
-xml = '<?xml version="1.0" encoding="utf-8"?>\n'
-xml += '<kaspi_catalog date="2025-09-12" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
-xml += 'xsi:schemaLocation="http://kaspi.kz/kaspishopping.xsd">\n'
-xml += f'  <company>Феникс</company>\n'
-xml += f'  <merchantid>16157146</merchantid>\n'
-xml += '  <offers>\n'
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += f'<kaspi_catalog xmlns="kaspiShopping" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+    xml += f'xsi:schemaLocation="http://kaspi.kz/kaspishopping.xsd" date="{date_now}">\n'
+    xml += f'  <company>{MERCHANT_ID}</company>\n'
+    xml += f'  <merchantid>{MERCHANT_ID}</merchantid>\n'
+    xml += '  <offers>\n'
 
     for row in reader:
         sku = html.escape(row.get("SKU", "").strip())
         model = html.escape(row.get("model", "").strip())
         brand = html.escape(row.get("brand", "").strip())
-        price = html.escape(row.get("price", "").strip())
+        price = row.get("price", "").strip() or "0"
 
         # Составляем availabilities
         availabilities = []
         for i in range(1, 6):  # PP1 … PP5
-            store_id = row.get(f"PP{i}", "").strip()
-            if store_id and store_id != "0":
-                pre_order = row.get("preorder", "0").strip()  # если есть предзаказ
-                stock_count = row.get(f"stockCount{i}", "0").strip()  # если есть количество
-                availabilities.append(f'<availability available="yes" storeId="{store_id}" preOrder="{pre_order}" stockCount="{stock_count}"/>')
+            store_suffix = f"PP{i}"
+            store_id_raw = row.get(f"PP{i}", "").strip()
+            if store_id_raw and store_id_raw != "0":
+                # preOrder и stockCount — числа, по умолчанию 0
+                pre_order = row.get(f"preorder{i}", "0").strip() or "0"
+                stock_count = row.get(f"stockCount{i}", "0").strip() or "0.0"
+                # stockCount с десятичной точкой
+                if "." not in stock_count:
+                    stock_count += ".0"
+                availabilities.append(
+                    f'<availability available="yes" storeId="{MERCHANT_ID}_{store_suffix}" preOrder="{pre_order}" stockCount="{stock_count}"/>'
+                )
+
+        # Если нет складов, ставим пустой availability с нулями
+        if not availabilities:
+            availabilities.append(
+                f'<availability available="no" storeId="{MERCHANT_ID}_PP1" preOrder="0" stockCount="0.0"/>'
+            )
 
         availabilities_xml = "\n      ".join(availabilities)
 
