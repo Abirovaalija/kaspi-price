@@ -7,30 +7,29 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Ссылка на Google Sheets в формате CSV
+# Ссылка на Google Sheets (CSV)
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgg_vbcJzq_IOqPNPbuTyuLfb1xvapOCP3nTQlfzNmcRj7wh9kyT1oyZJx2W5MSFmPBZeP5T133pj_/pub?gid=1749981972&single=true&output=csv"
 
-# ID магазина Феникс
+# ID магазина (Феникс)
 MERCHANT_ID = "16157146"
 
 @app.route('/')
 def home():
-    return "Сервер работает ✅. Данные доступны по адресу /price.xml"
+    return "Сервер работает ✅. Прайс доступен по адресу /price.xml"
 
 @app.route('/price.xml')
 def price_xml():
-    # Загружаем CSV из Google Sheets
+    # Загружаем CSV
     response = requests.get(CSV_URL)
     response.encoding = 'utf-8'
     csv_data = response.text
 
-    # Читаем CSV построчно
     reader = csv.DictReader(io.StringIO(csv_data))
 
-    # Текущее время для атрибута date
+    # Текущее время
     date_now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # Формируем XML по формату Каспи
+    # Формируем XML
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml += f'<kaspi_catalog xmlns="kaspiShopping" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
     xml += f'xsi:schemaLocation="http://kaspi.kz/kaspishopping.xsd" date="{date_now}">\n'
@@ -43,35 +42,23 @@ def price_xml():
         model = html.escape(row.get("model", "").strip())
         brand = html.escape(row.get("brand", "").strip())
         price = row.get("price", "").strip() or "0"
+        preorder_val = row.get("preOrder", "").strip() or "0"
 
-        # Составляем availabilities
+        # --- availabilities ---
         availabilities = []
         for i in range(1, 6):  # PP1 … PP5
-            store_suffix = f"PP{i}"
             stock_raw = row.get(f"PP{i}", "").strip()
-            stock_count = row.get(f"stockCount{i}", "0").strip() or "0.0"
+            stock_count = int(stock_raw) if stock_raw.isdigit() else 0
 
-            # stockCount с десятичной точкой
-            if "." not in stock_count:
-                stock_count += ".0"
+            available = "yes" if stock_count > 0 else "no"
 
-            if stock_raw and float(stock_count) > 0:
-                availabilities.append(
-                    f'<availability available="yes" storeId="{MERCHANT_ID}_{store_suffix}" preOrder="0" stockCount="{stock_count}"/>'
-                )
-            elif stock_raw:
-                availabilities.append(
-                    f'<availability available="no" storeId="{MERCHANT_ID}_{store_suffix}" preOrder="0" stockCount="{stock_count}"/>'
-                )
-
-        # Если нет складов вообще, добавляем один с available="no"
-        if not availabilities:
             availabilities.append(
-                f'<availability available="no" storeId="{MERCHANT_ID}_PP1" preOrder="0" stockCount="0.0"/>'
+                f'<availability available="{available}" storeId="{MERCHANT_ID}_PP{i}" preOrder="{preorder_val}" stockCount="{stock_count}"/>'
             )
 
         availabilities_xml = "\n      ".join(availabilities)
 
+        # --- offer ---
         xml += f'''    <offer sku="{sku}">
       <model>{model}</model>
       <brand>{brand}</brand>
