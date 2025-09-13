@@ -48,19 +48,23 @@ def price_xml():
         availabilities = []
         for i in range(1, 6):  # PP1 … PP5
             store_suffix = f"PP{i}"
-            store_id_raw = row.get(f"PP{i}", "").strip()
-            if store_id_raw and store_id_raw != "0":
-                # preOrder и stockCount — числа, по умолчанию 0
-                pre_order = row.get(f"preorder{i}", "0").strip() or "0"
-                stock_count = row.get(f"stockCount{i}", "0").strip() or "0.0"
-                # stockCount с десятичной точкой
-                if "." not in stock_count:
-                    stock_count += ".0"
+            stock_raw = row.get(f"PP{i}", "").strip()
+            stock_count = row.get(f"stockCount{i}", "0").strip() or "0.0"
+
+            # stockCount с десятичной точкой
+            if "." not in stock_count:
+                stock_count += ".0"
+
+            if stock_raw and float(stock_count) > 0:
                 availabilities.append(
-                    f'<availability available="yes" storeId="{MERCHANT_ID}_{store_suffix}" preOrder="{pre_order}" stockCount="{stock_count}"/>'
+                    f'<availability available="yes" storeId="{MERCHANT_ID}_{store_suffix}" preOrder="0" stockCount="{stock_count}"/>'
+                )
+            elif stock_raw:
+                availabilities.append(
+                    f'<availability available="no" storeId="{MERCHANT_ID}_{store_suffix}" preOrder="0" stockCount="{stock_count}"/>'
                 )
 
-        # Если нет складов, ставим пустой availability с нулями
+        # Если нет складов вообще, добавляем один с available="no"
         if not availabilities:
             availabilities.append(
                 f'<availability available="no" storeId="{MERCHANT_ID}_PP1" preOrder="0" stockCount="0.0"/>'
