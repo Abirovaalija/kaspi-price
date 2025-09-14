@@ -8,8 +8,7 @@ import html
 app = Flask(__name__)
 
 CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQgg_vbcJzq_IOqPNPbuTyuLfb1xvapOCP3nTQlfzNmcRj7wh9kyT1oyZJx2W5MSFmPBZeP5T133pj_/pub?output=csv"
-
-MERCHANT_ID = "16157146"  # Феникс
+MERCHANT_ID = "16157146"
 
 @app.route("/price.xml")
 def price():
@@ -18,46 +17,50 @@ def price():
     csv_file = io.StringIO(response.text)
     reader = csv.DictReader(csv_file)
 
-    today = datetime.today().strftime("%Y-%m-%d")
-
-    xml = f'<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml += f'<kaspi_catalog xmlns="http://kaspi.kz/kaspishopping" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" date="{today}">\n'
-    xml += f'  <company>{MERCHANT_ID}</company>\n'
-    xml += f'  <merchantid>{MERCHANT_ID}</merchantid>\n'
-    xml += f'  <offers>\n'
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    xml_parts = [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        f'<kaspi_catalog date="{now}" xmlns="kaspiShopping" '
+        'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+        'xsi:schemaLocation="kaspiShopping http://kaspi.kz/kaspishopping.xsd">',
+        f'  <company>{MERCHANT_ID}</company>',
+        f'  <merchantid>{MERCHANT_ID}</merchantid>',
+        '  <offers>'
+    ]
 
     for row in reader:
-        sku = html.escape(row["SKU"].strip())
-        model = html.escape(row["model"].strip())
-        brand = html.escape(row["brand"].strip())
-        price = row["price"].strip()
-        preorder = row.get("preOrder", "0").strip()
+        sku = row.get("SKU", "").strip()
+        model = html.escape(row.get("model", "").strip())
+        brand = html.escape(row.get("brand", "").strip() or "Без бренда")
+        price = row.get("price", "").strip()
 
-        if not sku or not model or not brand or not price:
-            continue  # пропускаем пустые строки
-
-        xml += f'    <offer sku="{sku}">\n'
-        xml += f'      <model>{model}</model>\n'
-        xml += f'      <brand>{brand}</brand>\n'
-
-        xml += f'      <availabilities>\n'
+        availabilities = []
         for i in range(1, 6):
             stock = row.get(f"PP{i}", "").strip()
-            if stock.isdigit():
-                available = "yes" if int(stock) > 0 else "no"
-                xml += f'        <availability available="{available}" storeId="{MERCHANT_ID}_PP{i}" preOrder="{preorder}" stockCount="{stock}"/>\n'
-        xml += f'      </availabilities>\n'
+            pre_order = row.get("preOrder", "0").strip()
 
-        xml += f'      <cityprices>\n'
-        xml += f'        <cityprice cityId="710000000">{price}</cityprice>\n'
-        xml += f'      </cityprices>\n'
+            if stock and stock.isdigit() and int(stock) > 0:
+                avail = f'<availability available="yes" storeId="{MERCHANT_ID}_PP{i}" preOrder="{pre_order}" stockCount="{stock}"/>'
+            else:
+                avail = f'<availability available="no" storeId="{MERCHANT_ID}_PP{i}" preOrder="{pre_order}" stockCount="0"/>'
+            availabilities.append(avail)
 
-        xml += f'    </offer>\n'
+        offer_xml = f"""
+    <offer sku="{sku}">
+      <model>{model}</model>
+      <brand>{brand}</brand>
+      <availabilities>
+        {' '.join(availabilities)}
+      </availabilities>
+      <price>{price}</price>
+    </offer>"""
+        xml_parts.append(offer_xml)
 
-    xml += f'  </offers>\n'
-    xml += f'</kaspi_catalog>'
+    xml_parts.append("  </offers>")
+    xml_parts.append("</kaspi_catalog>")
 
-    return Response(xml, mimetype="application/xml")
+    xml_content = "\n".join(xml_parts)
+    return Response(xml_content, mimetype="application/xml")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
