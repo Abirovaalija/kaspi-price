@@ -3,6 +3,7 @@ import requests
 import csv
 import io
 from datetime import datetime
+import html
 
 app = Flask(__name__)
 
@@ -20,33 +21,33 @@ def price():
     today = datetime.today().strftime("%Y-%m-%d")
 
     xml = f'<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml += f'<kaspi_catalog xmlns="kaspiShopping" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" date="{today}">\n'
+    xml += f'<kaspi_catalog xmlns="http://kaspi.kz/kaspishopping" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" date="{today}">\n'
     xml += f'  <company>{MERCHANT_ID}</company>\n'
     xml += f'  <merchantid>{MERCHANT_ID}</merchantid>\n'
     xml += f'  <offers>\n'
 
     for row in reader:
-        sku = row["SKU"].strip()
-        model = row["model"].strip()
-        brand = row["brand"].strip()
+        sku = html.escape(row["SKU"].strip())
+        model = html.escape(row["model"].strip())
+        brand = html.escape(row["brand"].strip())
         price = row["price"].strip()
         preorder = row.get("preOrder", "0").strip()
 
-        # формируем offer
+        if not sku or not model or not brand or not price:
+            continue  # пропускаем пустые строки
+
         xml += f'    <offer sku="{sku}">\n'
         xml += f'      <model>{model}</model>\n'
         xml += f'      <brand>{brand}</brand>\n'
 
-        # склады
         xml += f'      <availabilities>\n'
         for i in range(1, 6):
             stock = row.get(f"PP{i}", "").strip()
-            if stock and stock.isdigit():
+            if stock.isdigit():
                 available = "yes" if int(stock) > 0 else "no"
                 xml += f'        <availability available="{available}" storeId="{MERCHANT_ID}_PP{i}" preOrder="{preorder}" stockCount="{stock}"/>\n'
         xml += f'      </availabilities>\n'
 
-        # цены
         xml += f'      <cityprices>\n'
         xml += f'        <cityprice cityId="710000000">{price}</cityprice>\n'
         xml += f'      </cityprices>\n'
